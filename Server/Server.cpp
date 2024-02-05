@@ -7,12 +7,29 @@
 #include <ws2tcpip.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <map>
+#include <string>
 
 #pragma comment (lib, "Ws2_32.lib")
 // #pragma comment (lib, "Mswsock.lib")
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "21"
+
+std::map<std::string, int> requests = {
+    {"post", 0}
+};
+
+int parseRequest(char* buffer) {
+    printf("buffer %s", buffer);
+    std::string request = "";
+    int i = 0;
+    while (buffer[i] != ' ')
+        request.push_back(buffer[i++]);
+    printf("Searching for: %s\n", request);
+
+    return requests[request];
+}
 
 int __cdecl main(void)
 {
@@ -96,17 +113,24 @@ int __cdecl main(void)
     do {
         iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
         if (iResult > 0) {
+            int requestType = parseRequest(recvbuf);
 
-            recvbuf[iResult] = '\0';
-            printf("%s\n", recvbuf);
-
-            iSendResult = send(ClientSocket, recvbuf, iResult, 0);
-            if (iSendResult == SOCKET_ERROR) {
-                printf("send failed with error: %d\n", WSAGetLastError());
-                closesocket(ClientSocket);
-                WSACleanup();
-                return 1;
+            switch (requestType) {
+            case 0:
+                printf("UwU\n");
+                break;
+            default:
+                printf("Osef ???");
+                break;
             }
+
+            //iSendResult = send(ClientSocket, recvbuf, iResult, 0);
+            //if (iSendResult == SOCKET_ERROR) {
+            //    printf("send failed with error: %d\n", WSAGetLastError());
+            //    closesocket(ClientSocket);
+            //    WSACleanup();
+            //    return 1;
+            //}
         }
         else if (iResult == 0)
             printf("Connection closing...\n");
