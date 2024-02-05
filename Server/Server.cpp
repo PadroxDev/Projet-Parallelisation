@@ -8,12 +8,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-// Need to link with Ws2_32.lib
 #pragma comment (lib, "Ws2_32.lib")
 // #pragma comment (lib, "Mswsock.lib")
 
 #define DEFAULT_BUFLEN 512
-#define DEFAULT_PORT "27015"
+#define DEFAULT_PORT "21"
 
 int __cdecl main(void)
 {
@@ -36,7 +35,6 @@ int __cdecl main(void)
         printf("WSAStartup failed with error: %d\n", iResult);
         return 1;
     }
-    printf("%s", "SUCCES Startup\n");
 
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -51,7 +49,6 @@ int __cdecl main(void)
         WSACleanup();
         return 1;
     }
-    printf("%s", "SUCCES adress resolve\n");
 
     // Create a SOCKET for the server to listen for client connections.
     ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
@@ -61,7 +58,6 @@ int __cdecl main(void)
         WSACleanup();
         return 1;
     }
-    printf("%s", "SUCCES Socket create\n");
 
     // Setup the TCP listening socket
     iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
@@ -72,7 +68,6 @@ int __cdecl main(void)
         WSACleanup();
         return 1;
     }
-    printf("%s", "SUCCES LISTEN\n");
 
     freeaddrinfo(result);
 
@@ -83,8 +78,6 @@ int __cdecl main(void)
         WSACleanup();
         return 1;
     }
-    else
-        printf("%s", "SUCCES LISTEN\n");
 
     // Accept a client socket
     ClientSocket = accept(ListenSocket, NULL, NULL);
@@ -94,19 +87,19 @@ int __cdecl main(void)
         WSACleanup();
         return 1;
     }
-    printf("%s", "SUCCES ACCEPT CLIENT SOCKET");
+    printf("%s", "Client socket accepted !\n");
 
     // No longer need server socket
     closesocket(ListenSocket);
 
     // Receive until the peer shuts down the connection
     do {
-
         iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
         if (iResult > 0) {
-            printf("Bytes received: %d\n", iResult);
 
-            // Echo the buffer back to the sender
+            recvbuf[iResult] = '\0';
+            printf("%s\n", recvbuf);
+
             iSendResult = send(ClientSocket, recvbuf, iResult, 0);
             if (iSendResult == SOCKET_ERROR) {
                 printf("send failed with error: %d\n", WSAGetLastError());
@@ -114,7 +107,6 @@ int __cdecl main(void)
                 WSACleanup();
                 return 1;
             }
-            printf("Bytes sent: %d\n", iSendResult);
         }
         else if (iResult == 0)
             printf("Connection closing...\n");
