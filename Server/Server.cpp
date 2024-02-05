@@ -36,6 +36,7 @@ int __cdecl main(void)
         printf("WSAStartup failed with error: %d\n", iResult);
         return 1;
     }
+    printf("%s", "SUCCES Startup\n");
 
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -50,6 +51,7 @@ int __cdecl main(void)
         WSACleanup();
         return 1;
     }
+    printf("%s", "SUCCES adress resolve\n");
 
     // Create a SOCKET for the server to listen for client connections.
     ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
@@ -59,6 +61,7 @@ int __cdecl main(void)
         WSACleanup();
         return 1;
     }
+    printf("%s", "SUCCES Socket create\n");
 
     // Setup the TCP listening socket
     iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
@@ -69,7 +72,7 @@ int __cdecl main(void)
         WSACleanup();
         return 1;
     }
-    printf("%s", "SUCCES LISTEN");
+    printf("%s", "SUCCES LISTEN\n");
 
     freeaddrinfo(result);
 
@@ -81,7 +84,7 @@ int __cdecl main(void)
         return 1;
     }
     else
-        printf("%s", "SUCCES LISTEN");
+        printf("%s", "SUCCES LISTEN\n");
 
     // Accept a client socket
     ClientSocket = accept(ListenSocket, NULL, NULL);
