@@ -71,7 +71,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Users\avollet\source\repos\PadroxDev\Projet-Parallelisation\jsoncpp\include;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Users\avollet\source\repos\PadroxDev\Projet-Parallelisation\Thirdparties\jsoncpp\include</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
