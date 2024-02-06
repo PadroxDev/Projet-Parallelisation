@@ -68,7 +68,7 @@ int main(int argc, wchar_t** argv) {
     }
 
 
-    const char* postRequest = "test coubeh";
+    const char* postRequest = "noob coubeh";
     send(sock, postRequest, strlen(postRequest), 0);
 
     // Lecture et affichage de la réponse du serveur

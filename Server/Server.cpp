@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <map>
 #include <string>
+#include <json/json.h>
 
 #pragma comment (lib, "Ws2_32.lib")
 // #pragma comment (lib, "Mswsock.lib")
@@ -17,16 +18,15 @@
 #define DEFAULT_PORT "21"
 
 std::map<std::string, int> requests = {
-    {"post", 0}
+    {"post", 1},
 };
 
 int parseRequest(char* buffer) {
-    printf("buffer %s", buffer);
     std::string request = "";
     int i = 0;
     while (buffer[i] != ' ')
         request.push_back(buffer[i++]);
-    printf("Searching for: %s\n", request);
+    printf("Searching for: %s\n", request.c_str());
 
     return requests[request];
 }
@@ -114,6 +114,8 @@ int __cdecl main(void)
         iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
         if (iResult > 0) {
             int requestType = parseRequest(recvbuf);
+
+            printf("Result %d\n", requestType);
 
             switch (requestType) {
             case 0:
