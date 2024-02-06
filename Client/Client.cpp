@@ -89,14 +89,14 @@ int main(int argc, wchar_t** argv) {
     }
 
     Json::Value data;
-    data["command"] = "post";
+    data["command"] = "exit";
     data["grid_row_0"] = "00o";
     data["grid_row_1"] = "0ox";
     data["grid_row_2"] = "xxo";
+    
     std::string serializedData = convertJsonToString(data);
-
-    printf("Sent Length: %d\n", strlen(serializedData.c_str()));
     send(sock, serializedData.c_str(), strlen(serializedData.c_str()), 0);
+
     // Lecture et affichage de la réponse du serveur
     char buffer[1024];
     int bytesRead;

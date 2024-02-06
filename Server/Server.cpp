@@ -11,15 +11,12 @@
 #include <string>
 #include <json/json.h>
 #include <iostream>
+#include <stdexcept>
 
 #pragma comment (lib, "Ws2_32.lib")
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "21"
-
-std::map<std::string, int> requests = {
-    {"post", 1},
-};
 
 std::string convertJsonToString(const Json::Value& json) {
     Json::StreamWriterBuilder builder;
@@ -41,15 +38,16 @@ Json::Value parseJsonFromString(const std::string& jsonString) {
     return jsonData;
 }
 
-int parseRequest(Json::Value json) {
-    //std::string request = "";
-    //int i = 0;
-    //while (buffer[i] != ' ')
-    //    request.push_back(buffer[i++]);
-    //printf("Searching for: %s\n", request.c_str());
+constexpr unsigned int str2int(const char* str, int h = 0)
+{
+    return !str[h] ? 5381 : (str2int(str, h + 1) * 33) ^ str[h];
+}
 
-    //return requests[request];
-    return 0;
+void HandlePostRequest(SOCKET client, Json::Value data) {
+    printf("Post request from client\n");
+}
+
+void HandleExitRequest(SOCKET client, Json::Value data) {
 }
 
 int __cdecl main(void)
@@ -132,28 +130,23 @@ int __cdecl main(void)
 
     // Receive until the peer shuts down the connection
     do {
-        iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
-        if (iResult > 0) {
-            printf("Receive length: %d\n", recvbuflen);
-            std::string request(recvbuf, recvbuflen);
+        unsigned int bytesReceived = recv(ClientSocket, recvbuf, recvbuflen, 0);
+        if (bytesReceived > 0) {
+            std::string request(recvbuf, bytesReceived);
+            Json::Value jsonData = parseJsonFromString(request);
+            std::string command = jsonData["command"].asString();
 
-            printf("%s\n", request.c_str());
-
-            switch (0) {
-            case 0:
+            switch (str2int(command.c_str())) {
+            case str2int("post"):
+                HandlePostRequest(ClientSocket, jsonData);
                 break;
+            case str2int("exit"):
+                HandleExitRequest(ClientSocket, jsonData);
+                return 1;
             default:
-                printf("Osef ???");
+                printf("Unknown command !\nCommand: % s", command.c_str());
                 break;
             }
-
-            //iSendResult = send(ClientSocket, recvbuf, iResult, 0);
-            //if (iSendResult == SOCKET_ERROR) {
-            //    printf("send failed with error: %d\n", WSAGetLastError());
-            //    closesocket(ClientSocket);
-            //    WSACleanup();
-            //    return 1;
-            //}
         }
         else if (iResult == 0)
             printf("Connection closing...\n");
@@ -176,6 +169,10 @@ int __cdecl main(void)
     }
 
     // cleanup
+
+    /// TODO:
+    /// Close the server at end of code, but keep existing like a baka baby
+
     closesocket(ClientSocket);
     WSACleanup();
 
