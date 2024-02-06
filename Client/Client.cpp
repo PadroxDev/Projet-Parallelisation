@@ -10,6 +10,27 @@
 #include <ws2tcpip.h>
 #include <stdio.h>
 #include <stdlib.h>   // Needed for _wtoi
+#include <json/json.h>
+
+std::string convertJsonToString(const Json::Value& json) {
+    Json::StreamWriterBuilder builder;
+    std::ostringstream os;
+    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+    writer->write(json, &os);
+    return os.str();
+}
+
+Json::Value parseJsonFromString(const std::string& jsonString) {
+    Json::CharReaderBuilder builder;
+    Json::Value jsonData;
+    std::string errs;
+    std::istringstream is(jsonString);
+    if (!Json::parseFromStream(builder, is, &jsonData, &errs)) {
+        std::cerr << "Erreur lors du parsing JSON : " << errs << std::endl;
+        // Handle Error
+    }
+    return jsonData;
+}
 
 int main(int argc, wchar_t** argv) {
 
@@ -67,10 +88,15 @@ int main(int argc, wchar_t** argv) {
         return 1;
     }
 
+    Json::Value data;
+    data["command"] = "post";
+    data["grid_row_0"] = "00o";
+    data["grid_row_1"] = "0ox";
+    data["grid_row_2"] = "xxo";
+    std::string serializedData = convertJsonToString(data);
 
-    const char* postRequest = "noob coubeh";
-    send(sock, postRequest, strlen(postRequest), 0);
-
+    printf("Sent Length: %d\n", strlen(serializedData.c_str()));
+    send(sock, serializedData.c_str(), strlen(serializedData.c_str()), 0);
     // Lecture et affichage de la réponse du serveur
     char buffer[1024];
     int bytesRead;

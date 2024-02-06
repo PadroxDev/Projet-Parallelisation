@@ -10,9 +10,9 @@
 #include <map>
 #include <string>
 #include <json/json.h>
+#include <iostream>
 
 #pragma comment (lib, "Ws2_32.lib")
-// #pragma comment (lib, "Mswsock.lib")
 
 #define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "21"
@@ -21,14 +21,35 @@ std::map<std::string, int> requests = {
     {"post", 1},
 };
 
-int parseRequest(char* buffer) {
-    std::string request = "";
-    int i = 0;
-    while (buffer[i] != ' ')
-        request.push_back(buffer[i++]);
-    printf("Searching for: %s\n", request.c_str());
+std::string convertJsonToString(const Json::Value& json) {
+    Json::StreamWriterBuilder builder;
+    std::ostringstream os;
+    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+    writer->write(json, &os);
+    return os.str();
+}
 
-    return requests[request];
+Json::Value parseJsonFromString(const std::string& jsonString) {
+    Json::CharReaderBuilder builder;
+    Json::Value jsonData;
+    std::string errs;
+    std::istringstream is(jsonString);
+    if (!Json::parseFromStream(builder, is, &jsonData, &errs)) {
+        std::cerr << "Erreur lors du parsing JSON : " << errs << std::endl;
+        // Handle Error
+    }
+    return jsonData;
+}
+
+int parseRequest(Json::Value json) {
+    //std::string request = "";
+    //int i = 0;
+    //while (buffer[i] != ' ')
+    //    request.push_back(buffer[i++]);
+    //printf("Searching for: %s\n", request.c_str());
+
+    //return requests[request];
+    return 0;
 }
 
 int __cdecl main(void)
@@ -113,13 +134,13 @@ int __cdecl main(void)
     do {
         iResult = recv(ClientSocket, recvbuf, recvbuflen, 0);
         if (iResult > 0) {
-            int requestType = parseRequest(recvbuf);
+            printf("Receive length: %d\n", recvbuflen);
+            std::string request(recvbuf, recvbuflen);
 
-            printf("Result %d\n", requestType);
+            printf("%s\n", request.c_str());
 
-            switch (requestType) {
+            switch (0) {
             case 0:
-                printf("UwU\n");
                 break;
             default:
                 printf("Osef ???");

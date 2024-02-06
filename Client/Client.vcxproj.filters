@@ -13,10 +13,22 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="ThirdParties">
+      <UniqueIdentifier>{8cace22a-0de5-4464-91c1-122f1872f42f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Client.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Thirdparties\jsoncpp\src\lib_json\json_reader.cpp">
+      <Filter>ThirdParties</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Thirdparties\jsoncpp\src\lib_json\json_value.cpp">
+      <Filter>ThirdParties</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Thirdparties\jsoncpp\src\lib_json\json_writer.cpp">
+      <Filter>ThirdParties</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
