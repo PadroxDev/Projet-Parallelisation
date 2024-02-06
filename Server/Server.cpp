@@ -128,10 +128,13 @@ int __cdecl main(void)
     // No longer need server socket
     closesocket(ListenSocket);
 
+    int counter = 0;
+
     // Receive until the peer shuts down the connection
     do {
         unsigned int bytesReceived = recv(ClientSocket, recvbuf, recvbuflen, 0);
         if (bytesReceived > 0) {
+            counter++;
             std::string request(recvbuf, bytesReceived);
             Json::Value jsonData = parseJsonFromString(request);
             std::string command = jsonData["command"].asString();
@@ -157,7 +160,7 @@ int __cdecl main(void)
             return 1;
         }
 
-    } while (iResult > 0);
+    } while (counter < 2);
 
     // shutdown the connection since we're done
     iResult = shutdown(ClientSocket, SD_SEND);
