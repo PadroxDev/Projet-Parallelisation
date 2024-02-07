@@ -1,76 +1,37 @@
-#undef UNICODE
+#define _WINSOCK_DEPRECATED_NO_WARNINGS
 
-#define WIN32_LEAN_AND_MEAN
-
-#include <windows.h>
+#include <iostream>
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#include <stdlib.h>
 #include <stdio.h>
-#include <map>
-#include <string>
-#include <json/json.h>
-#include <iostream>
-#include <stdexcept>
+#include <stdlib.h>
 
-#pragma comment (lib, "Ws2_32.lib")
+// link with Ws2_32.lib
+#pragma comment(lib,"Ws2_32.lib")
 
-#define DEFAULT_BUFLEN 512
 #define DEFAULT_PORT "21"
+#define DEFAULT_BUFLEN 512
 
-std::string convertJsonToString(const Json::Value& json) {
-    Json::StreamWriterBuilder builder;
-    std::ostringstream os;
-    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
-    writer->write(json, &os);
-    return os.str();
-}
+LRESULT CALLBACK ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-Json::Value parseJsonFromString(const std::string& jsonString) {
-    Json::CharReaderBuilder builder;
-    Json::Value jsonData;
-    std::string errs;
-    std::istringstream is(jsonString);
-    if (!Json::parseFromStream(builder, is, &jsonData, &errs)) {
-        std::cerr << "Erreur lors du parsing JSON : " << errs << std::endl;
-        // Handle Error
-    }
-    return jsonData;
-}
-
-constexpr unsigned int str2int(const char* str, int h = 0)
-{
-    return !str[h] ? 5381 : (str2int(str, h + 1) * 33) ^ str[h];
-}
-
-void HandlePostRequest(SOCKET client, Json::Value data) {
-    printf("Post request from client\n");
-}
-
-void HandleExitRequest(SOCKET client, Json::Value data) {
-}
-
-int __cdecl main(void)
-{
+int main() {
     WSADATA wsaData;
-    int iResult;
-
     SOCKET ListenSocket = INVALID_SOCKET;
     SOCKET ClientSocket = INVALID_SOCKET;
-
-    struct addrinfo* result = NULL;
-    struct addrinfo hints;
-
-    int iSendResult;
+    struct addrinfo* result = NULL,
+        hints;
     char recvbuf[DEFAULT_BUFLEN];
+    int iResult;
     int recvbuflen = DEFAULT_BUFLEN;
 
     // Initialize Winsock
     iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != 0) {
-        printf("WSAStartup failed with error: %d\n", iResult);
+        printf("WSAStartup failed: %d\n", iResult);
         return 1;
     }
+
+    struct addrinfo* ptr = NULL;
 
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -78,27 +39,27 @@ int __cdecl main(void)
     hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = AI_PASSIVE;
 
-    // Resolve the server address and port
+    // Resolve the local address and port to be used by the server
     iResult = getaddrinfo(NULL, DEFAULT_PORT, &hints, &result);
     if (iResult != 0) {
-        printf("getaddrinfo failed with error: %d\n", iResult);
+        printf("getaddrinfo failed: %d\n", iResult);
         WSACleanup();
         return 1;
     }
 
-    // Create a SOCKET for the server to listen for client connections.
+    // Create a SOCKET for the server to listen for client connections
     ListenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
     if (ListenSocket == INVALID_SOCKET) {
-        printf("socket failed with error: %ld\n", WSAGetLastError());
+        printf("Error at socket(): %ld\n", WSAGetLastError());
         freeaddrinfo(result);
         WSACleanup();
         return 1;
     }
 
-    // Setup the TCP listening socket
+    // Bind the socket to an address and port
     iResult = bind(ListenSocket, result->ai_addr, (int)result->ai_addrlen);
     if (iResult == SOCKET_ERROR) {
-        printf("bind failed with error: %d\n", WSAGetLastError());
+        printf("bind failed: %d\n", WSAGetLastError());
         freeaddrinfo(result);
         closesocket(ListenSocket);
         WSACleanup();
@@ -107,77 +68,80 @@ int __cdecl main(void)
 
     freeaddrinfo(result);
 
+    // Start listening on the socket
     iResult = listen(ListenSocket, SOMAXCONN);
     if (iResult == SOCKET_ERROR) {
-        printf("listen failed with error: %d\n", WSAGetLastError());
+        printf("listen failed: %d\n", WSAGetLastError());
         closesocket(ListenSocket);
         WSACleanup();
         return 1;
     }
 
-    // Accept a client socket
-    ClientSocket = accept(ListenSocket, NULL, NULL);
-    if (ClientSocket == INVALID_SOCKET) {
-        printf("accept failed with error: %d\n", WSAGetLastError());
+    // Create a hidden window for socket events
+    WNDCLASS serverWindowClass = { 0 };
+    serverWindowClass.lpfnWndProc = ServerWindowProc;
+    serverWindowClass.hInstance = GetModuleHandle(NULL);
+    serverWindowClass.lpszClassName = L"MyServerWindowClass";
+    RegisterClass(&serverWindowClass);
+
+    HWND serverWindow = CreateWindowEx(0, L"MyServerWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
+    if (serverWindow == NULL) {
+        printf("CreateWindowEx failed with error: %d\n", GetLastError());
         closesocket(ListenSocket);
         WSACleanup();
         return 1;
     }
-    printf("%s", "Client socket accepted !\n");
 
-    // No longer need server socket
-    closesocket(ListenSocket);
+    // Associate the socket with the window to receive messages for socket events
+    WSAAsyncSelect(ListenSocket, serverWindow, WM_USER + 1, FD_ACCEPT);
 
-    int counter = 0;
-
-    // Receive until the peer shuts down the connection
-    do {
-        unsigned int bytesReceived = recv(ClientSocket, recvbuf, recvbuflen, 0);
-        if (bytesReceived > 0) {
-            counter++;
-            std::string request(recvbuf, bytesReceived);
-            Json::Value jsonData = parseJsonFromString(request);
-            std::string command = jsonData["command"].asString();
-
-            switch (str2int(command.c_str())) {
-            case str2int("post"):
-                HandlePostRequest(ClientSocket, jsonData);
-                break;
-            case str2int("exit"):
-                HandleExitRequest(ClientSocket, jsonData);
-                return 1;
-            default:
-                printf("Unknown command !\nCommand: % s", command.c_str());
-                break;
-            }
-        }
-        else if (iResult == 0)
-            printf("Connection closing...\n");
-        else {
-            printf("recv failed with error: %d\n", WSAGetLastError());
-            closesocket(ClientSocket);
-            WSACleanup();
-            return 1;
-        }
-
-    } while (counter < 2);
-
-    // shutdown the connection since we're done
-    iResult = shutdown(ClientSocket, SD_SEND);
-    if (iResult == SOCKET_ERROR) {
-        printf("shutdown failed with error: %d\n", WSAGetLastError());
-        closesocket(ClientSocket);
-        WSACleanup();
-        return 1;
+    // Receive until the peer closes the connection
+    MSG msg;
+    while (GetMessage(&msg, serverWindow, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
 
     // cleanup
-
-    /// TODO:
-    /// Close the server at end of code, but keep existing like a baka baby
-
-    closesocket(ClientSocket);
+    closesocket(ListenSocket);
     WSACleanup();
 
+    return 0;
+}
+
+LRESULT CALLBACK ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_USER + 1:
+        if (WSAGETSELECTEVENT(lParam) == FD_ACCEPT) {
+            // Accept a new connection
+            SOCKET ListenSocket = wParam;
+            SOCKET ClientSocket = accept(ListenSocket, NULL, NULL);
+            if (ClientSocket != INVALID_SOCKET) {
+                // Associate the client socket with the window to receive messages for socket events
+                WSAAsyncSelect(ClientSocket, hwnd, WM_USER + 1, FD_READ | FD_CLOSE);
+            }
+        }
+        else if (WSAGETSELECTEVENT(lParam) == FD_READ) {
+            // Handle read event
+            SOCKET ClientSocket = wParam;
+            char recvbuf[DEFAULT_BUFLEN];
+            int bytesRead = recv(ClientSocket, recvbuf, DEFAULT_BUFLEN, 0);
+            if (bytesRead > 0) {
+                printf("Bytes received: %d\n", bytesRead);
+                printf("Data received: %.*s\n", bytesRead, recvbuf);
+
+                // Echo back the received data
+                send(ClientSocket, recvbuf, bytesRead, 0);
+            }
+        }
+        else if (WSAGETSELECTEVENT(lParam) == FD_CLOSE) {
+            // Handle close event
+            printf("Connection closed\n");
+            closesocket(wParam);
+        }
+        break;
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
     return 0;
 }
