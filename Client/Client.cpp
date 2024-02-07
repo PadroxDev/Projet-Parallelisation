@@ -98,11 +98,9 @@ bool AssociateSocketWithWindow(SOCKET socket, HWND window, LONG events) {
     return true;
 }
 
-void CleanupSocket(SOCKET socket) {
-    closesocket(socket);
-}
-
-void CleanupWinsock() {
+void Cleanup(std::string message, SOCKET sock = NULL) {
+    printf("ERROR - %s", message.c_str());
+    if (socket) closesocket(sock);
     WSACleanup();
 }
 
@@ -113,34 +111,29 @@ int main() {
 
     SOCKET connectSocket = CreateAndConnectSocket("10.1.144.29");
     if (connectSocket == INVALID_SOCKET) {
-        CleanupWinsock();
+        Cleanup("Couldn't create the socket.\n");
         return 1;
     }
 
     HWND clientWindow;
     if (!CreateHiddenWindow(GetModuleHandle(NULL), ClientWindowProc, &clientWindow)) {
-        CleanupSocket(connectSocket);
-        CleanupWinsock();
+        Cleanup("Couldn't create the event handler window.\n", connectSocket);
         return 1;
     }
 
     if (!AssociateSocketWithWindow(connectSocket, clientWindow, FD_READ | FD_CLOSE)) {
-        CleanupSocket(connectSocket);
-        CleanupWinsock();
+        Cleanup("Couldn't associate the socket with the event handler window.\n", connectSocket);
         return 1;
     }
 
     // Send an initial buffer
     while (true)
     {
-        int iResult = send(connectSocket, "----------------------------\n", 14, 0);
+        int iResult = send(connectSocket, "----------------------------", 14, 0);
         if (iResult == SOCKET_ERROR) {
-            printf("send failed: %d\n", WSAGetLastError());
-            CleanupSocket(connectSocket);
-            CleanupWinsock();
+            Cleanup("Couldn't send data properly to the server\n", connectSocket);
             return 1;
         }
-        printf("Bytes Sent: %d\n", iResult);
     }
 
     // Receive until the peer closes the connection
@@ -150,8 +143,7 @@ int main() {
         DispatchMessage(&msg);
     }
 
-    CleanupSocket(connectSocket);
-    CleanupWinsock();
+    Cleanup("", connectSocket);
 
     return 0;
 }
