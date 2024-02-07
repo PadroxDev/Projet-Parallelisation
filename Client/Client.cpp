@@ -14,22 +14,20 @@
 
 LRESULT CALLBACK ClientWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-int main() {
+bool InitializeWinsock() {
     WSADATA wsaData;
-    SOCKET ConnectSocket = INVALID_SOCKET;
-    struct addrinfo* result = NULL,
-        * ptr = NULL,
-        hints;
-    char recvbuf[DEFAULT_BUFLEN];
-    int iResult;
-    int recvbuflen = DEFAULT_BUFLEN;
-
-    // Initialize Winsock
-    iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != 0) {
         printf("WSAStartup failed: %d\n", iResult);
-        return 1;
+        return false;
     }
+    return true;
+}
+
+SOCKET CreateAndConnectSocket(const char* serverAddress) {
+    struct addrinfo* result = nullptr, * ptr = nullptr, hints;
+    SOCKET connectSocket = INVALID_SOCKET;
+    int iResult;
 
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -37,29 +35,26 @@ int main() {
     hints.ai_protocol = IPPROTO_TCP;
 
     // Resolve the server address and port
-    iResult = getaddrinfo("10.1.144.29", DEFAULT_PORT, &hints, &result);
+    iResult = getaddrinfo(serverAddress, DEFAULT_PORT, &hints, &result);
     if (iResult != 0) {
         printf("getaddrinfo failed: %d\n", iResult);
-        WSACleanup();
-        return 1;
+        return INVALID_SOCKET;
     }
 
     // Attempt to connect to an address until one succeeds
     for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
-
         // Create a SOCKET for connecting to server
-        ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-        if (ConnectSocket == INVALID_SOCKET) {
+        connectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+        if (connectSocket == INVALID_SOCKET) {
             printf("socket failed: %ld\n", WSAGetLastError());
-            WSACleanup();
-            return 1;
+            continue;
         }
 
         // Connect to server.
-        iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
+        iResult = connect(connectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
         if (iResult == SOCKET_ERROR) {
-            closesocket(ConnectSocket);
-            ConnectSocket = INVALID_SOCKET;
+            closesocket(connectSocket);
+            connectSocket = INVALID_SOCKET;
             continue;
         }
         break;
@@ -67,52 +62,96 @@ int main() {
 
     freeaddrinfo(result);
 
-    if (ConnectSocket == INVALID_SOCKET) {
+    if (connectSocket == INVALID_SOCKET) {
         printf("Unable to connect to server!\n");
-        WSACleanup();
-        return 1;
+        return INVALID_SOCKET;
     }
 
-    // Create a hidden window for socket events
-    WNDCLASS clientWindowClass = { 0 };
-    clientWindowClass.lpfnWndProc = ClientWindowProc;
-    clientWindowClass.hInstance = GetModuleHandle(NULL);
-    clientWindowClass.lpszClassName = L"MyClientWindowClass";
-    RegisterClass(&clientWindowClass);
+    return connectSocket;
+}
 
-    HWND clientWindow = CreateWindowEx(0, L"MyClientWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
-    if (clientWindow == NULL) {
+bool CreateHiddenWindow(HINSTANCE hInstance, WNDPROC wndProc, HWND* pWindow) {
+    WNDCLASS windowClass = { 0 };
+    windowClass.lpfnWndProc = wndProc;
+    windowClass.hInstance = hInstance;
+    windowClass.lpszClassName = L"MyWindowClass";
+
+    if (!RegisterClass(&windowClass)) {
+        printf("RegisterClass failed with error: %d\n", GetLastError());
+        return false;
+    }
+
+    *pWindow = CreateWindowEx(0, L"MyWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
+    if (*pWindow == NULL) {
         printf("CreateWindowEx failed with error: %d\n", GetLastError());
-        closesocket(ConnectSocket);
-        WSACleanup();
+        return false;
+    }
+
+    return true;
+}
+
+bool AssociateSocketWithWindow(SOCKET socket, HWND window, LONG events) {
+    if (WSAAsyncSelect(socket, window, WM_USER + 1, events) == SOCKET_ERROR) {
+        printf("WSAAsyncSelect failed with error: %d\n", WSAGetLastError());
+        return false;
+    }
+    return true;
+}
+
+void CleanupSocket(SOCKET socket) {
+    closesocket(socket);
+}
+
+void CleanupWinsock() {
+    WSACleanup();
+}
+
+int main() {
+    if (!InitializeWinsock()) {
         return 1;
     }
 
-    // Associate the socket with the window to receive messages for socket events
-    WSAAsyncSelect(ConnectSocket, clientWindow, WM_USER + 1, FD_READ | FD_CLOSE);
+    SOCKET connectSocket = CreateAndConnectSocket("10.1.144.29");
+    if (connectSocket == INVALID_SOCKET) {
+        CleanupWinsock();
+        return 1;
+    }
+
+    HWND clientWindow;
+    if (!CreateHiddenWindow(GetModuleHandle(NULL), ClientWindowProc, &clientWindow)) {
+        CleanupSocket(connectSocket);
+        CleanupWinsock();
+        return 1;
+    }
+
+    if (!AssociateSocketWithWindow(connectSocket, clientWindow, FD_READ | FD_CLOSE)) {
+        CleanupSocket(connectSocket);
+        CleanupWinsock();
+        return 1;
+    }
 
     // Send an initial buffer
-    iResult = send(ConnectSocket, "this is a test", 14, 0);
-    if (iResult == SOCKET_ERROR) {
-        printf("send failed: %d\n", WSAGetLastError());
-        closesocket(ConnectSocket);
-        WSACleanup();
-        return 1;
+    while (true)
+    {
+        int iResult = send(connectSocket, "----------------------------\n", 14, 0);
+        if (iResult == SOCKET_ERROR) {
+            printf("send failed: %d\n", WSAGetLastError());
+            CleanupSocket(connectSocket);
+            CleanupWinsock();
+            return 1;
+        }
+        printf("Bytes Sent: %d\n", iResult);
     }
-    printf("Bytes Sent: %ld\n", iResult);
 
     // Receive until the peer closes the connection
-    do {
-        MSG msg;
-        if (GetMessage(&msg, clientWindow, 0, 0)) {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-    } while (iResult > 0);
+    MSG msg;
+    while (GetMessage(&msg, clientWindow, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
 
-    // cleanup
-    closesocket(ConnectSocket);
-    WSACleanup();
+    CleanupSocket(connectSocket);
+    CleanupWinsock();
 
     return 0;
 }
