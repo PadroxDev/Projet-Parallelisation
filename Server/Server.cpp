@@ -110,8 +110,9 @@ void CleanupWinsock() {
 }
 
 int main() {
-    if (!InitializeWinsock())
+    if (!InitializeWinsock()) {
         return 1;
+    }
 
     SOCKET listenSocket = CreateListenSocket();
     if (listenSocket == INVALID_SOCKET) {
