@@ -138,7 +138,11 @@
     <ClCompile Include="..\Thirdparties\jsoncpp\src\lib_json\json_reader.cpp" />
     <ClCompile Include="..\Thirdparties\jsoncpp\src\lib_json\json_value.cpp" />
     <ClCompile Include="..\Thirdparties\jsoncpp\src\lib_json\json_writer.cpp" />
+    <ClCompile Include="ConnectServer.cpp" />
     <ClCompile Include="Server.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ConnectServer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

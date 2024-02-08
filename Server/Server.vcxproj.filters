@@ -30,5 +30,13 @@
     <ClCompile Include="..\Thirdparties\jsoncpp\src\lib_json\json_writer.cpp">
       <Filter>ThirdParties</Filter>
     </ClCompile>
+    <ClCompile Include="ConnectServer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ConnectServer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

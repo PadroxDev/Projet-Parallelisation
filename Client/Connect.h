@@ -18,9 +18,14 @@ private:
 public:
 	Connect();
 	~Connect();
-    int InitializeWinSock();
-    int SetConnexion();
-    int CreateHiddenWindow();
+    bool InitializeWinSock();
+    SOCKET CreateAndConnectSocket(const char* serverAddress);
+    bool CreateHiddenWindow(HINSTANCE hInstance, WNDPROC wndProc, HWND* pWindow);
+    bool AssociateSocketWithWindow(HWND window, LONG events);
+    void CleanupSocket(SOCKET socket);
+    void CleanupWinsock();
+    int Send(char* buff);
+    int initialize();
 	
 };
 

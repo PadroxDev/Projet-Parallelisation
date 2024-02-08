@@ -80,13 +80,11 @@ bool CreateHiddenWindow(HINSTANCE hInstance, WNDPROC wndProc, HWND* pWindow) {
         printf("RegisterClass failed with error: %d\n", GetLastError());
         return false;
     }
-
     *pWindow = CreateWindowEx(0, L"MyWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
     if (*pWindow == NULL) {
         printf("CreateWindowEx failed with error: %d\n", GetLastError());
         return false;
     }
-
     return true;
 }
 

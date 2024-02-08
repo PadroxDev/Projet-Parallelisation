@@ -139,9 +139,11 @@
     <ClCompile Include="..\Thirdparties\jsoncpp\src\lib_json\json_value.cpp" />
     <ClCompile Include="..\Thirdparties\jsoncpp\src\lib_json\json_writer.cpp" />
     <ClCompile Include="Client.cpp" />
+    <ClCompile Include="Connect.cpp" />
     <ClCompile Include="EventWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Connect.h" />
     <ClInclude Include="EventWindow.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
