@@ -1,19 +1,24 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
-#define DEFAULT_PORT "21"
-#define DEFAULT_BUFLEN 512
-#include "ConnectServer.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
 
-LRESULT CALLBACK ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+#include "ConnectServer.h"
 
-ConnectServer::ConnectServer(){
+#define DEFAULT_PORT "21"
+#define DEFAULT_BUFLEN 512
+
+ConnectServer::ConnectServer() : clientSocket(INVALID_SOCKET), hWnd(NULL) {
     Initialize();
 }
 
+ConnectServer::~ConnectServer()
+{}
+
 bool ConnectServer::InitializeWinsock() {
-    iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+    WSADATA wsaData;
+    int iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (iResult != 0) {
         printf("WSAStartup failed: %d\n", iResult);
         return false;
@@ -21,7 +26,10 @@ bool ConnectServer::InitializeWinsock() {
     return true;
 }
 
-SOCKET ConnectServer::CreateListenSocket() {
+bool ConnectServer::CreateClientSocket() {
+    struct addrinfo* result = NULL,
+        * ptr = NULL,
+        hints;
 
     ZeroMemory(&hints, sizeof(hints));
     hints.ai_family = AF_INET;
@@ -29,45 +37,45 @@ SOCKET ConnectServer::CreateListenSocket() {
     hints.ai_protocol = IPPROTO_TCP;
     hints.ai_flags = AI_PASSIVE;
 
-    iResult = getaddrinfo(nullptr, DEFAULT_PORT, &hints, &result);
+    int iResult = getaddrinfo(nullptr, DEFAULT_PORT, &hints, &result);
     if (iResult != 0) {
         printf("getaddrinfo failed: %d\n", iResult);
-        return INVALID_SOCKET;
+        return false;
     }
 
-    listenSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-    if (listenSocket == INVALID_SOCKET) {
+    clientSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (clientSocket == INVALID_SOCKET) {
         printf("Error at socket(): %ld\n", WSAGetLastError());
         freeaddrinfo(result);
-        return INVALID_SOCKET;
+        Cleanup();
+        return false;
     }
 
-    iResult = bind(listenSocket, result->ai_addr, (int)result->ai_addrlen);
+    iResult = bind(clientSocket, result->ai_addr, (int)result->ai_addrlen);
     if (iResult == SOCKET_ERROR) {
         printf("bind failed: %d\n", WSAGetLastError());
         freeaddrinfo(result);
-        closesocket(listenSocket);
-        return INVALID_SOCKET;
+        Cleanup(clientSocket);
+        return false;
     }
 
     freeaddrinfo(result);
-
-    return listenSocket;
+    return true;
 }
 
-bool ConnectServer::StartListening(SOCKET listenSocket) {
-    if (listen(listenSocket, SOMAXCONN) == SOCKET_ERROR) {
+bool ConnectServer::StartListening() {
+    if (listen(clientSocket, SOMAXCONN) == SOCKET_ERROR) {
         printf("listen failed: %d\n", WSAGetLastError());
-        closesocket(listenSocket);
+        Cleanup(clientSocket);
         return false;
     }
     return true;
 }
 
-bool ConnectServer::CreateHiddenWindow(HINSTANCE hInstance, WNDPROC wndProc, HWND* pWindow) {
+bool ConnectServer::CreateHiddenWindow() {
     WNDCLASS windowClass = { 0 };
-    windowClass.lpfnWndProc = wndProc;
-    windowClass.hInstance = hInstance;
+    windowClass.lpfnWndProc = ServerWindowProc;
+    windowClass.hInstance = GetModuleHandle(NULL);
     windowClass.lpszClassName = L"MyWindowClass";
 
     if (!RegisterClass(&windowClass)) {
@@ -75,8 +83,8 @@ bool ConnectServer::CreateHiddenWindow(HINSTANCE hInstance, WNDPROC wndProc, HWN
         return false;
     }
 
-    *pWindow = CreateWindowEx(0, L"MyWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
-    if (*pWindow == NULL) {
+    hWnd = CreateWindowEx(0, L"MyWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
+    if (hWnd == NULL) {
         printf("CreateWindowEx failed with error: %d\n", GetLastError());
         return false;
     }
@@ -84,63 +92,60 @@ bool ConnectServer::CreateHiddenWindow(HINSTANCE hInstance, WNDPROC wndProc, HWN
     return true;
 }
 
-
-bool AssociateSocketWithWindow(SOCKET socket, HWND window, LONG events) {
-    if (WSAAsyncSelect(socket, window, WM_USER + 1, events) == SOCKET_ERROR) {
+bool ConnectServer::AssociateWithWindow() {
+    LONG events = FD_ACCEPT;
+    if (WSAAsyncSelect(clientSocket, hWnd, WM_USER + 1, events) == SOCKET_ERROR) {
         printf("WSAAsyncSelect failed with error: %d\n", WSAGetLastError());
         return false;
     }
     return true;
 }
 
-void ConnectServer::CleanupSocket(SOCKET socket) {
-    closesocket(socket);
+void ConnectServer::Cleanup(SOCKET socket = NULL) {
+    if (socket) closesocket(socket);
+    Cleanup();
 }
 
-void ConnectServer::CleanupWinsock() {
-    WSACleanup();
+bool ConnectServer::Initialize() {
+    if (!InitializeWinsock())
+        return true;
+
+    clientSocket = CreateClientSocket();
+    if (clientSocket == INVALID_SOCKET) {
+        Cleanup();
+        return true;
+    }
+
+    if (!StartListening()) {
+        Cleanup(clientSocket);
+        return true;
+    }
+
+    if (!CreateHiddenWindow()) {
+        Cleanup(clientSocket);
+        return true;
+    }
+
+    SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)this);
+
+    if (!AssociateWithWindow()) {
+        Cleanup(clientSocket);
+        return true;
+    }
+    return false;
 }
 
-int ConnectServer::Initialize() {
-    if (!InitializeWinsock()) {
-        return 1;
-    }
+LRESULT CALLBACK ConnectServer::ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
 
-    SOCKET listenSocket = CreateListenSocket();
-    if (listenSocket == INVALID_SOCKET) {
-        CleanupWinsock();
-        return 1;
-    }
+    ConnectServer* pServer = (ConnectServer*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
-    if (!StartListening(listenSocket)) {
-        CleanupSocket(listenSocket);
-        CleanupWinsock();
-        return 1;
-    }
-
-    HWND serverWindow;
-    if (!CreateHiddenWindow(GetModuleHandle(NULL), ServerWindowProc, &serverWindow)) {
-        CleanupSocket(listenSocket);
-        CleanupWinsock();
-        return 1;
-    }
-
-    if (!AssociateSocketWithWindow(listenSocket, serverWindow, FD_ACCEPT)) {
-        CleanupSocket(listenSocket);
-        CleanupWinsock();
-        return 1;
-    }
-    return 0;
-}
-
-LRESULT CALLBACK ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_USER + 1:
         if (WSAGETSELECTEVENT(lParam) == FD_ACCEPT) {
             // Accept a new connection
             SOCKET ListenSocket = wParam;
             SOCKET ClientSocket = accept(ListenSocket, NULL, NULL);
-            clientSockets.push_back(ClientSocket);
+            pServer->clientSockets.push_back(ClientSocket);
             if (ClientSocket != INVALID_SOCKET) {
                 // Associate the client socket with the window to receive messages for socket events
                 WSAAsyncSelect(ClientSocket, hwnd, WM_USER + 1, FD_READ | FD_CLOSE);
@@ -162,7 +167,7 @@ LRESULT CALLBACK ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
         else if (WSAGETSELECTEVENT(lParam) == FD_CLOSE) {
             // Handle close event
             printf("Connection closed\n");
-            closesocket(wParam);
+            Cleanup(clientSocket);
         }
         break;
     default:

@@ -109,7 +109,7 @@ int Connect::initialize() {
     if (!InitializeWinSock()) {
         return 1;
     }
-    CreateAndConnectSocket("10.1.144.29");
+    CreateAndConnectSocket("10.1.144.31");
     if (ConnectSocket == INVALID_SOCKET) {
         CleanupWinsock();
         return 1;
@@ -128,7 +128,7 @@ int Connect::initialize() {
     return 0;
 }
 
-int Connect::Send(char* buff) {
+int Connect::Send(const char* buff) {
     iResult = send(ConnectSocket,buff,strlen(buff), 0);
     if (iResult == SOCKET_ERROR) {
         printf("send failed: %d\n", WSAGetLastError());
