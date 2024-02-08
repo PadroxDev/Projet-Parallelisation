@@ -1,6 +1,7 @@
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include <stdio.h>
+#include <iostream>
 #include <stdlib.h>
 #include <vector>
 
@@ -9,7 +10,7 @@
 #define DEFAULT_PORT "21"
 #define DEFAULT_BUFLEN 512
 
-ConnectServer::ConnectServer() : clientSocket(INVALID_SOCKET), hWnd(NULL) {
+ConnectServer::ConnectServer() : serverSocket(INVALID_SOCKET), hWnd(NULL) {
     Initialize();
 }
 
@@ -43,19 +44,19 @@ bool ConnectServer::CreateClientSocket() {
         return false;
     }
 
-    clientSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
-    if (clientSocket == INVALID_SOCKET) {
+    serverSocket = socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (serverSocket == INVALID_SOCKET) {
         printf("Error at socket(): %ld\n", WSAGetLastError());
         freeaddrinfo(result);
         Cleanup();
         return false;
     }
 
-    iResult = bind(clientSocket, result->ai_addr, (int)result->ai_addrlen);
+    iResult = bind(serverSocket, result->ai_addr, (int)result->ai_addrlen);
     if (iResult == SOCKET_ERROR) {
         printf("bind failed: %d\n", WSAGetLastError());
         freeaddrinfo(result);
-        Cleanup(clientSocket);
+        Cleanup(serverSocket);
         return false;
     }
 
@@ -64,9 +65,9 @@ bool ConnectServer::CreateClientSocket() {
 }
 
 bool ConnectServer::StartListening() {
-    if (listen(clientSocket, SOMAXCONN) == SOCKET_ERROR) {
+    if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
         printf("listen failed: %d\n", WSAGetLastError());
-        Cleanup(clientSocket);
+        Cleanup(serverSocket);
         return false;
     }
     return true;
@@ -94,7 +95,7 @@ bool ConnectServer::CreateHiddenWindow() {
 
 bool ConnectServer::AssociateWithWindow() {
     LONG events = FD_ACCEPT;
-    if (WSAAsyncSelect(clientSocket, hWnd, WM_USER + 1, events) == SOCKET_ERROR) {
+    if (WSAAsyncSelect(serverSocket, hWnd, WM_USER + 1, events) == SOCKET_ERROR) {
         printf("WSAAsyncSelect failed with error: %d\n", WSAGetLastError());
         return false;
     }
@@ -110,29 +111,58 @@ bool ConnectServer::Initialize() {
     if (!InitializeWinsock())
         return true;
 
-    clientSocket = CreateClientSocket();
-    if (clientSocket == INVALID_SOCKET) {
+    serverSocket = CreateClientSocket();
+    if (serverSocket == INVALID_SOCKET) {
         Cleanup();
         return true;
     }
 
     if (!StartListening()) {
-        Cleanup(clientSocket);
+        Cleanup(serverSocket);
         return true;
     }
 
     if (!CreateHiddenWindow()) {
-        Cleanup(clientSocket);
+        Cleanup(serverSocket);
         return true;
     }
 
     SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)this);
 
     if (!AssociateWithWindow()) {
-        Cleanup(clientSocket);
+        Cleanup(serverSocket);
         return true;
     }
     return false;
+}
+
+void ConnectServer::HandleAccept(SOCKET sock) {
+    SOCKET incomingSocket;
+    incomingSocket = accept(sock, NULL, NULL);
+    if (incomingSocket == INVALID_SOCKET) {
+        Cleanup(serverSocket);
+        std::cout << "Error accepting an incomming socket !" << std::endl;
+        return;
+    }
+    clientSockets.push_back(incomingSocket);
+    WSAAsyncSelect(incomingSocket, hWnd, WM_USER + 1, FD_READ | FD_CLOSE);
+}
+
+void ConnectServer::HandleRead(SOCKET sock) {
+    char recvbuf[DEFAULT_BUFLEN];
+    int bytesRead = recv(sock, recvbuf, DEFAULT_BUFLEN, 0);
+    if (bytesRead > 0) {
+        //printf("Bytes received: %d\n", bytesRead);
+        printf("%.*s\n", bytesRead, recvbuf);
+
+        // Echo back the received data
+        send(sock, recvbuf, bytesRead, 0);
+    }
+}
+
+void ConnectServer::HandleClose(SOCKET sock) {
+    std::cout << "Connection closed" << std::endl;
+    Cleanup(sock);
 }
 
 LRESULT CALLBACK ConnectServer::ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -141,35 +171,24 @@ LRESULT CALLBACK ConnectServer::ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wP
 
     switch (uMsg) {
     case WM_USER + 1:
-        if (WSAGETSELECTEVENT(lParam) == FD_ACCEPT) {
-            // Accept a new connection
-            SOCKET ListenSocket = wParam;
-            SOCKET ClientSocket = accept(ListenSocket, NULL, NULL);
-            pServer->clientSockets.push_back(ClientSocket);
-            if (ClientSocket != INVALID_SOCKET) {
-                // Associate the client socket with the window to receive messages for socket events
-                WSAAsyncSelect(ClientSocket, hwnd, WM_USER + 1, FD_READ | FD_CLOSE);
-            }
-        }
-        else if (WSAGETSELECTEVENT(lParam) == FD_READ) {
-            // Handle read event
-            SOCKET ClientSocket = wParam;
-            char recvbuf[DEFAULT_BUFLEN];
-            int bytesRead = recv(ClientSocket, recvbuf, DEFAULT_BUFLEN, 0);
-            if (bytesRead > 0) {
-                //printf("Bytes received: %d\n", bytesRead);
-                printf("%.*s\n", bytesRead, recvbuf);
 
-                // Echo back the received data
-                send(ClientSocket, recvbuf, bytesRead, 0);
-            }
+        int fdEvent = WSAGETSELECTEVENT(lParam);
+        SOCKET sock = wParam;
+
+        switch (fdEvent) {
+        case FD_ACCEPT:
+            pServer->HandleAccept(sock);
+            break;
+        case FD_READ:
+            pServer->HandleRead(sock);
+            break;
+        case FD_CLOSE:
+            pServer->HandleClose(sock);
+            break;
+        default:
+            std::cout << "Event not found: " << fdEvent << " !" << std::endl;
+            break;
         }
-        else if (WSAGETSELECTEVENT(lParam) == FD_CLOSE) {
-            // Handle close event
-            printf("Connection closed\n");
-            Cleanup(clientSocket);
-        }
-        break;
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }

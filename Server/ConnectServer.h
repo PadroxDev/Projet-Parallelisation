@@ -7,9 +7,10 @@
 class ConnectServer
 {
 private:
-	SOCKET clientSocket;
+	SOCKET serverSocket;
 	HWND hWnd;
 	std::vector<SOCKET> clientSockets;
+
 public:
 	ConnectServer();
 	~ConnectServer();
@@ -21,6 +22,11 @@ public:
 	bool CreateHiddenWindow();
 	bool AssociateWithWindow();
 	void Cleanup(SOCKET socket);
-	
+
+	void EventDispatcher(int fdEvent, SOCKET sock);
+	void HandleAccept(SOCKET sock);
+	void HandleRead(SOCKET sock);
+	void HandleClose(SOCKET sock);
+
 	static LRESULT CALLBACK ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 };

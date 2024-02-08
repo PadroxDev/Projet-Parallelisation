@@ -2,7 +2,6 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-
 class Connect
 {
 private:
@@ -16,7 +15,7 @@ public:
 	Connect();
 	~Connect();
     bool InitializeWinSock();
-    bool CreateSocket(const char* serverAddress);
+    bool CreateClientSocket(const char* serverAddress);
     bool CreateHiddenWindow(HINSTANCE hInstance, WNDPROC wndProc, HWND* pWindow);
     bool AssociateSocketWithWindow(HWND window, LONG events);
     void CleanupSocket(SOCKET socket);
