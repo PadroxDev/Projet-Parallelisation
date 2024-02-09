@@ -13,5 +13,6 @@
 
 int main() {
     ConnectServer Server;
+    while (true);
     return 0;
 }

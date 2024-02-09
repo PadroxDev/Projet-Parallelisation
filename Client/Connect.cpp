@@ -74,13 +74,17 @@ bool Connect::CreateHiddenWindow() {
     clientWindowClass.lpfnWndProc = ClientWindowProc;
     clientWindowClass.hInstance = GetModuleHandle(NULL);
     clientWindowClass.lpszClassName = L"MyClientWindowClass";
-    RegisterClass(&clientWindowClass);
 
     if (!RegisterClass(&clientWindowClass)) {
         printf("RegisterClass failed with error: %d\n", GetLastError());
         return false;
     }
-    hWnd = CreateWindowEx(0, L"MyWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
+    if (clientWindowClass.hInstance == NULL) {
+        printf("GetModuleHandle failed with error: %d\n", GetLastError());
+        return false;
+    }
+
+    hWnd = CreateWindowEx(0, L"MyClientWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, clientWindowClass.hInstance, NULL);
     if (hWnd == NULL) {
         printf("CreateWindowEx failed with error: %d\n", GetLastError());
         return false;
@@ -108,7 +112,7 @@ int Connect::initialize() {
     if (!InitializeWinSock()) {
         return 1;
     }
-    CreateAndConnectSocket("10.1.144.31");
+    CreateAndConnectSocket("10.1.144.29");
     if (ConnectSocket == INVALID_SOCKET) {
         CleanupWinsock();
         return 1;
