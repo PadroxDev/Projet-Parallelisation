@@ -5,6 +5,7 @@
 #define DEFAULT_PORT "21"
 #define DEFAULT_BUFLEN 512
 
+const char* SERVER_IP_ADDR = "10.1.144.30";
 
 Connect::Connect() : ConnectSocket(INVALID_SOCKET) {
     recvbuf[DEFAULT_BUFLEN];
@@ -24,7 +25,6 @@ bool Connect::InitializeWinSock() {
     }
     return true;
 };
-
 
 SOCKET Connect::CreateAndConnectSocket(const char* serverAddress) {
 
@@ -75,12 +75,13 @@ bool Connect::CreateHiddenWindow() {
     clientWindowClass.hInstance = GetModuleHandle(NULL);
     clientWindowClass.lpszClassName = L"MyClientWindowClass";
 
-    if (!RegisterClass(&clientWindowClass)) {
-        printf("RegisterClass failed with error: %d\n", GetLastError());
-        return false;
-    }
     if (clientWindowClass.hInstance == NULL) {
         printf("GetModuleHandle failed with error: %d\n", GetLastError());
+        return false;
+    }
+
+    if (!RegisterClass(&clientWindowClass)) {
+        printf("RegisterClass failed with error: %d\n", GetLastError());
         return false;
     }
 
@@ -112,7 +113,7 @@ int Connect::initialize() {
     if (!InitializeWinSock()) {
         return 1;
     }
-    CreateAndConnectSocket("10.1.144.29");
+    CreateAndConnectSocket(SERVER_IP_ADDR);
     if (ConnectSocket == INVALID_SOCKET) {
         CleanupWinsock();
         return 1;
