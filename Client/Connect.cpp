@@ -25,7 +25,6 @@ bool Connect::InitializeWinSock() {
     return true;
 };
 
-LRESULT CALLBACK ClientWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 SOCKET Connect::CreateAndConnectSocket(const char* serverAddress) {
 
@@ -70,10 +69,10 @@ SOCKET Connect::CreateAndConnectSocket(const char* serverAddress) {
     return ConnectSocket;
 }
 
-bool Connect::CreateHiddenWindow(HINSTANCE hInstance, WNDPROC wndProc, HWND* pWindow) {
+bool Connect::CreateHiddenWindow() {
     WNDCLASS clientWindowClass = { 0 };
-    clientWindowClass.lpfnWndProc = wndProc;
-    clientWindowClass.hInstance = hInstance;
+    clientWindowClass.lpfnWndProc = ClientWindowProc;
+    clientWindowClass.hInstance = GetModuleHandle(NULL);
     clientWindowClass.lpszClassName = L"MyClientWindowClass";
     RegisterClass(&clientWindowClass);
 
@@ -81,8 +80,8 @@ bool Connect::CreateHiddenWindow(HINSTANCE hInstance, WNDPROC wndProc, HWND* pWi
         printf("RegisterClass failed with error: %d\n", GetLastError());
         return false;
     }
-    *pWindow = CreateWindowEx(0, L"MyWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
-    if (*pWindow == NULL) {
+    hWnd = CreateWindowEx(0, L"MyWindowClass", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
+    if (hWnd == NULL) {
         printf("CreateWindowEx failed with error: %d\n", GetLastError());
         return false;
     }
@@ -114,13 +113,12 @@ int Connect::initialize() {
         CleanupWinsock();
         return 1;
     }
-    HWND clientWindow;
-    if (!CreateHiddenWindow(GetModuleHandle(NULL), ClientWindowProc, &clientWindow)){
+    if (!CreateHiddenWindow()){
         CleanupSocket(ConnectSocket);
         CleanupWinsock();
         return 1;
     }
-    if (!AssociateSocketWithWindow(clientWindow, FD_READ | FD_CLOSE)) {
+    if (!AssociateSocketWithWindow(hWnd, FD_READ | FD_CLOSE)) {
         CleanupSocket(ConnectSocket);
         CleanupWinsock();
         return 1;
@@ -140,11 +138,14 @@ int Connect::Send(const char* buff) {
     return 0;
 }
 
-LRESULT CALLBACK ClientWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+LRESULT CALLBACK Connect::ClientWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    
+    Connect* pClient = (Connect*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
+
     switch (uMsg) {
     case WM_USER + 1:
+
         if (WSAGETSELECTEVENT(lParam) == FD_READ) {
-            // Handle read event
             SOCKET sock = wParam;
             char buffer[DEFAULT_BUFLEN];
             int bytesRead = recv(sock, buffer, DEFAULT_BUFLEN, 0);
@@ -154,7 +155,6 @@ LRESULT CALLBACK ClientWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lP
             }
         }
         else if (WSAGETSELECTEVENT(lParam) == FD_CLOSE) {
-            // Handle close event
             printf("Connection closed\n");
             closesocket(wParam);
             PostQuitMessage(0);
