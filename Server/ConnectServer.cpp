@@ -61,11 +61,17 @@ bool ConnectServer::CreateClientSocket() {
         return false;
     }
 
+    std::cout << "After Bind: " << (serverSocket != INVALID_SOCKET ? "PAPAGNAN" : "SUCE LA BITE") << std::endl;
+
     freeaddrinfo(result);
+
+    std::cout << "After Freeaddrinfo: " << (serverSocket != INVALID_SOCKET ? "PAPAGNAN" : "SUCE LA BITE") << std::endl;
+
     return true;
 }
 
 bool ConnectServer::StartListening() {
+    std::cout << "OnListen: " << (serverSocket != INVALID_SOCKET ? "PAPAGNAN" : "SUCE LA BITE") << std::endl;
     if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
         printf("listen failed: %d\n", WSAGetLastError());
         Cleanup(serverSocket);
@@ -110,32 +116,32 @@ void ConnectServer::Cleanup(SOCKET socket = NULL) {
 
 bool ConnectServer::Initialize() {
     if (!InitializeWinsock())
-        return true;
+        return false;
 
     serverSocket = CreateClientSocket();
     if (serverSocket == INVALID_SOCKET) {
         Cleanup();
-        return true;
+        return false;
     }
 
     if (!StartListening()) {
         Cleanup(serverSocket);
-        return true;
+        return false;
     }
 
     if (!CreateHiddenWindow()) {
         Cleanup(serverSocket);
-        return true;
+        return false;
     }
 
     SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)this);
 
     if (!AssociateWithWindow()) {
         Cleanup(serverSocket);
-        return true;
+        return false;
     }
-    printf("papagnan");
-    return false;
+
+    return true;
 }
 
 void ConnectServer::HandleAccept(SOCKET sock) {
@@ -196,13 +202,15 @@ LRESULT CALLBACK ConnectServer::ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wP
 
     switch (uMsg) {
     case WM_USER + 1:
+    {
         int fdEvent = WSAGETSELECTEVENT(lParam);
         SOCKET sock = wParam; // Socket client qui fait la requête
 
         pServer->EventDispatcher(fdEvent, sock);
-
+    }
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
+        break;
     }
     return 0;
 }
