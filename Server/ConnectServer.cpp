@@ -61,19 +61,14 @@ bool ConnectServer::CreateClientSocket() {
         return false;
     }
 
-    std::cout << "After Bind: " << (serverSocket != INVALID_SOCKET ? "PAPAGNAN" : "SUCE LA BITE") << std::endl;
-
     freeaddrinfo(result);
-
-    std::cout << "After Freeaddrinfo: " << (serverSocket != INVALID_SOCKET ? "PAPAGNAN" : "SUCE LA BITE") << std::endl;
 
     return true;
 }
 
 bool ConnectServer::StartListening() {
-    std::cout << "OnListen: " << (serverSocket != INVALID_SOCKET ? "PAPAGNAN" : "SUCE LA BITE") << std::endl;
     if (listen(serverSocket, SOMAXCONN) == SOCKET_ERROR) {
-        printf("listen failed: %d\n", WSAGetLastError());
+        printf("listen failed: %d\n", WSAGetLastError());   
         Cleanup(serverSocket);
         return false;
     }
@@ -111,15 +106,14 @@ bool ConnectServer::AssociateWithWindow() {
 
 void ConnectServer::Cleanup(SOCKET socket = NULL) {
     if (socket) closesocket(socket);
-    Cleanup();
+    WSACleanup();
 }
 
 bool ConnectServer::Initialize() {
     if (!InitializeWinsock())
         return false;
 
-    serverSocket = CreateClientSocket();
-    if (serverSocket == INVALID_SOCKET) {
+    if (!CreateClientSocket()) {
         Cleanup();
         return false;
     }
