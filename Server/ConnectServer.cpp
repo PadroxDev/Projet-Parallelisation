@@ -14,8 +14,9 @@ ConnectServer::ConnectServer() : serverSocket(INVALID_SOCKET), hWnd(NULL) {
     Initialize();
 }
 
-ConnectServer::~ConnectServer()
-{}
+ConnectServer::~ConnectServer() {
+    Cleanup(serverSocket);
+}
 
 bool ConnectServer::InitializeWinsock() {
     WSADATA wsaData;
@@ -162,33 +163,43 @@ void ConnectServer::HandleRead(SOCKET sock) {
 
 void ConnectServer::HandleClose(SOCKET sock) {
     std::cout << "Connection closed" << std::endl;
-    Cleanup(sock);
+    for (int i = clientSockets.size() - 1; i >= 0; i--)
+    {
+        if (clientSockets[i] == sock) {
+            clientSockets.erase(clientSockets.begin() + i);
+            break;
+        }
+    }
+    closesocket(sock);
+}
+
+void ConnectServer::EventDispatcher(int fdEvent, SOCKET sock) {
+    switch (fdEvent) {
+    case FD_ACCEPT:
+        HandleAccept(sock);
+        break;
+    case FD_READ:
+        HandleRead(sock);
+        break;
+    case FD_CLOSE:
+        HandleClose(sock);
+        break;
+    default:
+        std::cout << "Event not found: " << fdEvent << " !" << std::endl;
+        break;
+    }
 }
 
 LRESULT CALLBACK ConnectServer::ServerWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-
     ConnectServer* pServer = (ConnectServer*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
 
     switch (uMsg) {
     case WM_USER + 1:
-
         int fdEvent = WSAGETSELECTEVENT(lParam);
-        SOCKET sock = wParam;
+        SOCKET sock = wParam; // Socket client qui fait la requête
 
-        switch (fdEvent) {
-        case FD_ACCEPT:
-            pServer->HandleAccept(sock);
-            break;
-        case FD_READ:
-            pServer->HandleRead(sock);
-            break;
-        case FD_CLOSE:
-            pServer->HandleClose(sock);
-            break;
-        default:
-            std::cout << "Event not found: " << fdEvent << " !" << std::endl;
-            break;
-        }
+        pServer->EventDispatcher(fdEvent, sock);
+
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }
