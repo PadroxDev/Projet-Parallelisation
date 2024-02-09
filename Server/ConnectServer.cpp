@@ -48,7 +48,7 @@ bool ConnectServer::CreateClientSocket() {
     if (serverSocket == INVALID_SOCKET) {
         printf("Error at socket(): %ld\n", WSAGetLastError());
         freeaddrinfo(result);
-        Cleanup();
+        Cleanup(serverSocket);
         return false;
     }
 
@@ -133,6 +133,7 @@ bool ConnectServer::Initialize() {
         Cleanup(serverSocket);
         return true;
     }
+    printf("papagnan");
     return false;
 }
 
