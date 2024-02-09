@@ -156,7 +156,8 @@ void ConnectServer::HandleRead(SOCKET sock) {
     if (bytesRead > 0) {
         //printf("Bytes received: %d\n", bytesRead);
         printf("%.*s\n", bytesRead, recvbuf);
-
+        std::string msg(recvbuf, bytesRead);
+        std::cout << msg << std::endl;
         // Echo back the received data
         send(sock, recvbuf, bytesRead, 0);
     }

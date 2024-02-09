@@ -13,7 +13,8 @@ Connect::Connect() : ConnectSocket(INVALID_SOCKET) {
 };
 
 Connect::~Connect() {
-
+    CleanupSocket(ConnectSocket);
+    CleanupWinsock();
 };
 
 bool Connect::InitializeWinSock() {
@@ -112,7 +113,7 @@ int Connect::initialize() {
     if (!InitializeWinSock()) {
         return 1;
     }
-    CreateAndConnectSocket("10.1.144.29");
+    CreateAndConnectSocket("10.1.144.31");
     if (ConnectSocket == INVALID_SOCKET) {
         CleanupWinsock();
         return 1;
